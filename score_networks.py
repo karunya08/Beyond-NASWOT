@@ -3,11 +3,10 @@ import nasspace
 import datasets
 import random
 import numpy as np
-import torch
 import os
+import torch
 from scores import get_score_func
 from scipy import stats
-from pycls.models.nas.nas import Cell
 from utils import add_dropout, init_network 
 
 parser = argparse.ArgumentParser(description='NAS Without Training')
@@ -56,12 +55,16 @@ def get_batch_jacobian(net, x, target, device, args=None):
     return jacob, target.detach(), y.detach(), out.detach()
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+if device.type == 'cuda':
+    print(f'Using GPU {args.GPU}: {torch.cuda.get_device_name(0)} (PyTorch CUDA {torch.version.cuda})', flush=True)
+else:
+    print(f'CUDA unavailable; using CPU (PyTorch {torch.__version__}, CUDA build: {torch.version.cuda})', flush=True)
+searchspace = nasspace.get_search_space(args)
 savedataset = args.dataset
 dataset = 'fake' if 'fake' in args.dataset else args.dataset
 args.dataset = args.dataset.replace('fake', '')
 if args.dataset == 'cifar10':
     args.dataset = args.dataset + '-valid'
-searchspace = nasspace.get_search_space(args)
 if 'valid' in args.dataset:
     args.dataset = args.dataset.replace('-valid', '')
 train_loader = datasets.get_data(args.dataset, args.data_loc, args.trainval, args.batch_size, args.augtype, args.repeat, args)
@@ -112,15 +115,19 @@ for i, (uid, network) in enumerate(searchspace):
                     pass
 
                 
-            def counting_backward_hook(module, inp, out):
+            def counting_backward_hook(module, grad_input, grad_output):
+                # Updated signature for register_full_backward_hook (PyTorch 2.x)
                 module.visited_backwards = True
 
-                
+            for m in network.modules():
+                if hasattr(m, "inplace"):
+                    m.inplace = False    
             for name, module in network.named_modules():
                 if 'ReLU' in str(type(module)):
                     #hooks[name] = module.register_forward_hook(counting_hook)
                     module.register_forward_hook(counting_forward_hook)
-                    module.register_backward_hook(counting_backward_hook)
+                    # Use register_full_backward_hook for PyTorch 2.x compatibility
+                    module.register_full_backward_hook(counting_backward_hook)
 
         network = network.to(device)
         random.seed(args.seed)

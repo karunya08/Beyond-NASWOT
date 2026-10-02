@@ -541,7 +541,7 @@ class ArchResults(object):
   def create_from_state_dict(state_dict_or_file):
     x = ArchResults(-1, -1)
     if isinstance(state_dict_or_file, str): # a file path
-      state_dict = torch.load(state_dict_or_file, map_location='cpu')
+      state_dict = torch.load(state_dict_or_file, map_location='cpu', weights_only=False)
     elif isinstance(state_dict_or_file, dict):
       state_dict = state_dict_or_file
     else:

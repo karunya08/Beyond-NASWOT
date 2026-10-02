@@ -67,7 +67,12 @@ class NASBench201API(NASBenchMetaAPI):
       if verbose: print('try to create the NAS-Bench-201 api from {:}'.format(file_path_or_dict))
       assert os.path.isfile(file_path_or_dict), 'invalid path : {:}'.format(file_path_or_dict)
       self.filename = Path(file_path_or_dict).name
-      file_path_or_dict = torch.load(file_path_or_dict, map_location='cpu')
+      # weights_only=False needed because NAS-Bench-201 data contains Python objects
+      # file_path_or_dict = torch.load(file_path_or_dict, map_location='cpu', weights_only=False)
+      import io
+      with open(file_path_or_dict, 'rb') as f:
+        buf = io.BytesIO(f.read())
+        file_path_or_dict = torch.load(buf, map_location='cpu', weights_only=False)
     elif isinstance(file_path_or_dict, dict):
       file_path_or_dict = copy.deepcopy(file_path_or_dict)
     else: raise ValueError('invalid type : {:} not in [str, dict]'.format(type(file_path_or_dict)))
@@ -108,7 +113,7 @@ class NASBench201API(NASBenchMetaAPI):
       assert 0 <= idx < len(self.meta_archs), 'invalid index of {:}'.format(idx)
       xfile_path = os.path.join(archive_root, '{:06d}-FULL.pth'.format(idx))
       assert os.path.isfile(xfile_path), 'invalid data path : {:}'.format(xfile_path)
-      xdata = torch.load(xfile_path, map_location='cpu')
+      xdata = torch.load(xfile_path, map_location='cpu', weights_only=False)
       assert isinstance(xdata, dict) and 'full' in xdata and 'less' in xdata, 'invalid format of data in {:}'.format(xfile_path)
       hp2archres = OrderedDict()
       hp2archres['12'] = ArchResults.create_from_state_dict(xdata['less'])

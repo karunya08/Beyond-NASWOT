@@ -1,5 +1,4 @@
 import torch
-from pycls.models.nas.nas import Cell
 
 class DropChannel(torch.nn.Module):
     def __init__(self, p, mod):
