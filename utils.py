@@ -1,4 +1,53 @@
+import numpy as np
 import torch
+import torch.nn.functional as F
+
+def get_activation_mask(inp, mask_type='relu'):
+    """Return an activation derivative mask for the given input tensor.
+
+    Args:
+        inp: flattened activation tensor (batch_size, features).
+        mask_type: one of 'relu', 'swish', 'hardmish'.
+
+    Returns:
+        Tensor of the same shape as inp containing the derivative values.
+    """
+    if mask_type == 'relu':
+        # ReLU derivative: 1 where x > 0, else 0 (original NASWOT)
+        return (inp > 0).float()
+    elif mask_type == 'swish':
+        # Swish / SiLU: f(x) = x * sigmoid(x)
+        # f'(x) = sigmoid(x) + x * sigmoid(x) * (1 - sigmoid(x))
+        sig = torch.sigmoid(inp)
+        return sig + inp * sig * (1.0 - sig)
+    elif mask_type == 'hardmish':
+        # Hard Mish: f(x) = 0 if x<=-2, x*(x+2)/2 if -2<x<0, x if x>=0
+        # f'(x) = 0 if x<=-2, x+1 if -2<x<0, 1 if x>=0
+        return torch.where(
+            inp >= 0,
+            torch.ones_like(inp),
+            torch.where(
+                inp > -2,
+                inp + 1.0,
+                torch.zeros_like(inp),
+            ),
+        )
+    else:
+        raise ValueError(f"Unknown mask_type '{mask_type}'. Choose from: relu, swish, hardmish")
+
+
+def get_binary_tau_mask(inp, threshold=0.0):
+    """Return a binary mask by thresholding activations (original NASWOT method).
+
+    Args:
+        inp: flattened activation tensor (batch_size, features).
+        threshold: cutoff value; activations above this become 1, else 0.
+
+    Returns:
+        Binary tensor of the same shape as inp.
+    """
+    return (inp > threshold).float()
+
 
 class DropChannel(torch.nn.Module):
     def __init__(self, p, mod):

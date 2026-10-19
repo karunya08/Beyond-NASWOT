@@ -7,7 +7,7 @@ import os
 import torch
 from scores import get_score_func
 from scipy import stats
-from utils import add_dropout, init_network 
+from utils import add_dropout, init_network, get_activation_mask, get_binary_tau_mask
 
 parser = argparse.ArgumentParser(description='NAS Without Training')
 parser.add_argument('--data_loc', default='../cifardata/', type=str, help='dataset folder')
@@ -34,6 +34,14 @@ parser.add_argument('--stem_out_channels', default=16, type=int, help='output ch
 parser.add_argument('--num_stacks', default=3, type=int, help='#stacks of modules (nasbench101)')
 parser.add_argument('--num_modules_per_stack', default=3, type=int, help='#modules per stack (nasbench101)')
 parser.add_argument('--num_labels', default=1, type=int, help='#classes (nasbench101)')
+parser.add_argument('--method', default='binary_tau', type=str, choices=['binary_tau', 'masks'],
+                    help='scoring method: binary_tau (original NASWOT) or masks (derivative masks)')
+parser.add_argument('--mask_type', default='relu', type=str, choices=['relu', 'swish', 'hardmish'],
+                    help='activation derivative mask, used when --method=masks (default: relu)')
+parser.add_argument('--threshold', default=0.0, type=float,
+                    help='threshold for binary_tau method (default: 0.0)')
+parser.add_argument('--max_archs', default=0, type=int,
+                    help='max architectures to score (0 = all)')
 
 args = parser.parse_args()
 os.environ['CUDA_VISIBLE_DEVICES'] = args.GPU
@@ -92,6 +100,8 @@ except:
 
 
 for i, (uid, network) in enumerate(searchspace):
+    if args.max_archs > 0 and i >= args.max_archs:
+        break
     # Reproducibility
     try:
         if args.dropout:
@@ -107,7 +117,10 @@ for i, (uid, network) in enumerate(searchspace):
                     if isinstance(inp, tuple):
                         inp = inp[0]
                     inp = inp.view(inp.size(0), -1)
-                    x = (inp > 0).float()
+                    if args.method == 'binary_tau':
+                        x = get_binary_tau_mask(inp, args.threshold)
+                    else:
+                        x = get_activation_mask(inp, args.mask_type)
                     K = x @ x.t()
                     K2 = (1.-x) @ (1.-x.t())
                     network.K = network.K + K.cpu().numpy() + K2.cpu().numpy()
