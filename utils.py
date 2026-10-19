@@ -1,13 +1,33 @@
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
+
+
+# Map mask_type names to nn.Module classes (for activation swapping)
+# These match the JAHS-Bench-201 activation choices
+ACTIVATION_MODULES = {
+    'relu':      nn.ReLU,
+    'hardswish': nn.Hardswish,
+    'mish':      nn.Mish,
+}
+
+
+def replace_relu(model, new_act_class):
+    """Recursively replace every nn.ReLU in *model* with *new_act_class()*."""
+    for name, module in model.named_children():
+        if isinstance(module, nn.ReLU):
+            setattr(model, name, new_act_class())
+        else:
+            replace_relu(module, new_act_class)
+    return model
 
 def get_activation_mask(inp, mask_type='relu'):
     """Return an activation derivative mask for the given input tensor.
 
     Args:
         inp: flattened activation tensor (batch_size, features).
-        mask_type: one of 'relu', 'swish', 'hardmish'.
+        mask_type: one of 'relu', 'hardswish', 'mish'.
 
     Returns:
         Tensor of the same shape as inp containing the derivative values.
@@ -15,25 +35,28 @@ def get_activation_mask(inp, mask_type='relu'):
     if mask_type == 'relu':
         # ReLU derivative: 1 where x > 0, else 0 (original NASWOT)
         return (inp > 0).float()
-    elif mask_type == 'swish':
-        # Swish / SiLU: f(x) = x * sigmoid(x)
-        # f'(x) = sigmoid(x) + x * sigmoid(x) * (1 - sigmoid(x))
-        sig = torch.sigmoid(inp)
-        return sig + inp * sig * (1.0 - sig)
-    elif mask_type == 'hardmish':
-        # Hard Mish: f(x) = 0 if x<=-2, x*(x+2)/2 if -2<x<0, x if x>=0
-        # f'(x) = 0 if x<=-2, x+1 if -2<x<0, 1 if x>=0
+    elif mask_type == 'hardswish':
+        # Hardswish: f(x) = x * ReLU6(x+3) / 6
+        # f'(x) = 0 if x<=-3, (2x+3)/6 if -3<x<3, 1 if x>=3
         return torch.where(
-            inp >= 0,
+            inp >= 3,
             torch.ones_like(inp),
             torch.where(
-                inp > -2,
-                inp + 1.0,
+                inp > -3,
+                (2 * inp + 3) / 6,
                 torch.zeros_like(inp),
             ),
         )
+    elif mask_type == 'mish':
+        # Mish: f(x) = x * tanh(softplus(x))
+        # f'(x) = tanh(sp) + x * sigmoid(x) * (1 - tanh(sp)^2)
+        #   where sp = softplus(x) = ln(1 + e^x)
+        sp = F.softplus(inp)
+        tanh_sp = torch.tanh(sp)
+        sig = torch.sigmoid(inp)
+        return tanh_sp + inp * sig * (1.0 - tanh_sp * tanh_sp)
     else:
-        raise ValueError(f"Unknown mask_type '{mask_type}'. Choose from: relu, swish, hardmish")
+        raise ValueError(f"Unknown mask_type '{mask_type}'. Choose from: relu, hardswish, mish")
 
 
 def get_binary_tau_mask(inp, threshold=0.0):
