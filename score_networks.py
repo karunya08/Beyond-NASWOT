@@ -129,6 +129,8 @@ def iterate_architectures():
     """Yield (loop_index, uid, network) for each architecture to score."""
     if gt_uids is not None:
         for i, uid in enumerate(gt_uids):
+            if args.max_archs > 0 and i >= args.max_archs:
+                return
             network = searchspace.get_network(int(uid))
             yield i, int(uid), network
     else:
@@ -164,8 +166,9 @@ for i, uid, network in iterate_architectures():
                         x = get_activation_mask(inp, args.mask_type)
                     K = x @ x.t()
                     K2 = (1.-x) @ (1.-x.t())
-                    network.K = network.K + K.cpu().numpy() + K2.cpu().numpy()
-                except:
+                    network.K = network.K + K.detach().cpu().numpy() + K2.detach().cpu().numpy()
+                except Exception as e:
+                    # print(f"  [HOOK ERROR] {type(e).__name__}: {e}")
                     pass
 
                 
