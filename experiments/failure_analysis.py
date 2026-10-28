@@ -6,10 +6,14 @@ Identify and characterize NASWOT failure cases on NAS-Bench-201.
 False positives: architectures ranked highly by NASWOT but with low actual accuracy.
 False negatives: architectures ranked poorly by NASWOT but with high actual accuracy.
 
-Usage
------
-python failure_analysis.py --scores results/full_baseline_hook_logdet_nasbench201_cifar10__none_0.05_1_True_128_1_1.npy \
-                           --accs results/full_baseline_accs_nasbench201_cifar10_True.npy
+Run from project root:
+    python experiments/failure_analysis.py \
+        --scores results/full_baseline_hook_logdet_nasbench201_cifar10__none_0.05_1_True_128_1_1.npy \
+        --accs results/full_baseline_accs_nasbench201_cifar10_True.npy
+
+Prerequisite: Pre-computed NASWOT scores in results/ (already present)
+    python score_networks.py --trainval --augtype none --repeat 1 --score hook_logdet \
+        --batch_size 128 --GPU 0 --dataset cifar10
 """
 
 import argparse

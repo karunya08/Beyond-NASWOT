@@ -8,11 +8,15 @@ If the theory is correct:
   - Overrated:   high logdet, LOW feature diversity (many cheap redundant channels)
   - Underrated:  modest logdet, HIGH feature diversity (fewer but diverse channels)
 
-Usage:
-    python compare_overrated_underrated.py --GPU 0
+Run from project root:
+    python experiments/compare_overrated_underrated.py --trainval --GPU 0
+
+Prerequisite: Run failure_analysis.py first to generate failure_sets/
 """
 
 import argparse
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import nasspace
 import datasets
 import random

@@ -6,11 +6,14 @@ Generates charts and tables showing:
 2. Derivative mask vs binary mask comparison (show they're nearly identical)
 3. Score correlation across activations (show rankings don't change with mask type)
 
-Usage:
-    .naswot\Scripts\python.exe analyze_activation_agnostic.py
+Run from project root:
+    python experiments/analyze_activation_agnostic.py --GPU 0
+
+Prerequisite: None (builds networks and scores from scratch)
 """
 
-import os
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import torch
 import torch.nn as nn
 import numpy as np

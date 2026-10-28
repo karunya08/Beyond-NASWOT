@@ -1,6 +1,6 @@
 # Beyond NASWOT
 
-**Course**: CS6886
+**Course**: C6886 | **Team**: Karunya Harikrishnan, Tejaswi  
 Based on [Neural Architecture Search Without Training](https://github.com/BayesWatch/nas-without-training) (Mellor et al., ICML 2021)
 
 ---
@@ -16,7 +16,7 @@ NASWOT scores untrained architectures using activation-pattern diversity (log de
 
 ### Finding 1: NASWOT is Activation-Agnostic at Random Init (P1/P2)
 
-We implemented derivative masks (`sigma'(h)`) for HardSwish and Mish (alongside ReLU) from **jahs-bench 201**. Key insight: in untrained networks, pre-activation magnitudes grow with depth (~4000 by layer 15). The smooth transition region of Swish/Mish lies in [-3, 3] -- essentially no values land there. All asymptotically-linear activations (ReLU, Swish, Mish, GELU, ELU) degenerate to the same binary step function at random init.
+We implemented derivative masks (`sigma'(h)`) for HardSwish and Mish (alongside ReLU). Key insight: in untrained networks, pre-activation magnitudes grow with depth (~4000 by layer 15). The smooth transition region of Swish/Mish lies in [-3, 3] -- essentially no values land there. All asymptotically-linear activations (ReLU, Swish, Mish, GELU, ELU) degenerate to the same binary step function at random init.
 
 **Implication**: NASWOT already works for all mainstream activations without modification. The exception is doubly-saturating activations (tanh, sigmoid), for which it degenerates entirely.
 
@@ -69,15 +69,32 @@ Gradient Consistency (GC) = cosine similarity of gradients on two mini-batches. 
 
 ## Setup
 
-```bash
-# Create venv (Python 3.11, PyTorch 2.0.1+CUDA 11.8)
-python -m venv .naswot
-.naswot\Scripts\activate  # Windows
-pip install torch==2.0.1+cu118 --index-url https://download.pytorch.org/whl/cu118
-pip install numpy<2 scipy matplotlib tqdm yacs thop
+### Option 1: Conda (recommended)
 
-# Download NAS-Bench-201 (~2GB) and place at ../NAS-Bench-201-v1_0-e61699.pth
+```bash
+conda config --set channel_priority strict
+conda env create -f env.yml --solver=libmamba
+conda activate naswot
 ```
+
+`env.yml` uses the `pytorch`, `nvidia` and `defaults` channels only. Do **not** add `conda-forge` (causes DLL load failures on Windows).
+
+### Option 2: venv + pip
+
+```bash
+python -m venv .naswot
+.naswot\Scripts\activate      # Windows
+source .naswot/bin/activate   # Linux/Mac
+pip install torch==2.0.1+cu118 torchvision==0.15.2+cu118 --index-url https://download.pytorch.org/whl/cu118
+pip install "numpy>=1.24,<2" scipy matplotlib tqdm yacs thop
+```
+
+### Data & Benchmark
+
+1. **CIFAR-10/100**: Downloaded automatically on first run to `../cifardata/`
+2. **NAS-Bench-201 API** (~2 GB): Download `NAS-Bench-201-v1_0-e61699.pth` from the [NAS-Bench-201 repository](https://github.com/D-X-Y/NAS-Bench-201) and place at `../NAS-Bench-201-v1_0-e61699.pth` (or pass `--api_loc <path>`)
+
+---
 
 ## Usage
 
@@ -93,22 +110,16 @@ python score_networks.py --trainval --augtype none --repeat 1 --score hook_logde
     --batch_size 128 --GPU 0 --dataset cifar10 --method masks --mask_type relu
 
 # Derivative masks, HardSwish
-python score_networks.py --trainval --augtype none --repeat 1 --score hook_logdet \
-    --batch_size 128 --GPU 0 --dataset cifar10 --method masks --mask_type hardswish
+python score_networks.py ... --method masks --mask_type hardswish
 
 # Derivative masks, Mish
-python score_networks.py --trainval --augtype none --repeat 1 --score hook_logdet \
-    --batch_size 128 --GPU 0 --dataset cifar10 --method masks --mask_type mish
+python score_networks.py ... --method masks --mask_type mish
 
-# Different datasets
-python score_networks.py --trainval --augtype none --repeat 1 --score hook_logdet \
-    --batch_size 128 --GPU 0 --dataset cifar100 --method masks --mask_type relu
-python score_networks.py --trainval --augtype none --repeat 1 --score hook_logdet \
-    --batch_size 128 --GPU 0 --dataset ImageNet16-120 --method masks --mask_type relu
+# Different datasets: cifar10 | cifar100 | ImageNet16-120
+python score_networks.py ... --dataset cifar100
 
-# Quick test (first 50 architectures)
-python score_networks.py --trainval --augtype none --repeat 1 --score hook_logdet \
-    --batch_size 128 --GPU 0 --dataset cifar10 --max_archs 50
+# Quick test (first 50 architectures only)
+python score_networks.py ... --max_archs 50
 ```
 
 ### Feature diversity & pipeline
@@ -122,30 +133,82 @@ python search_pipeline.py --trainval --GPU 0                        # NASWOT + G
 python search_pipeline.py --trainval --GPU 0 --primary feat_div     # FeatDiv + GC
 
 # Generate plots from pipeline results
-python plot_pipeline.py --results results/pipeline_naswot_topk3856_gc.npy.npz
-python plot_pipeline.py --results results/pipeline_feat_div_topk3906_gc.npy.npz
+python plots/plot_pipeline.py --results results/pipeline_naswot_topk3856_gc.npy.npz
+python plots/plot_pipeline.py --results results/pipeline_feat_div_topk3906_gc.npy.npz
 ```
 
 ### Failure analysis
 
 ```bash
-python compare_overrated_underrated.py --trainval --GPU 0
-python skip_stratified_analysis.py --trainval --GPU 0
+# Identify overrated/underrated architectures (requires pre-computed NASWOT scores)
+python experiments/failure_analysis.py \
+    --scores results/full_baseline_hook_logdet_nasbench201_cifar10__none_0.05_1_True_128_1_1.npy \
+    --accs results/full_baseline_accs_nasbench201_cifar10_True.npy
+
+# Structural attribution (requires failure_sets/ from above)
+python experiments/failure_attribution.py
+
+# Feature diversity comparison of overrated vs underrated
+python experiments/compare_overrated_underrated.py --trainval --GPU 0
+
+# Stratified analysis by skip count (requires pre-computed NASWOT scores)
+python experiments/skip_stratified_analysis.py
+
+# Activation agnosticity analysis
+python experiments/analyze_activation_agnostic.py --GPU 0
 ```
 
-## Key Files
+### Plots
 
-| File                              | Purpose                                                                   |
-| --------------------------------- | ------------------------------------------------------------------------- |
-| `score_networks.py`               | NASWOT scoring with P1/P2 extensions (derivative masks, binary threshold) |
-| `score_networks_expressivity.py`  | P3: layer-weighted spectral scoring                                       |
-| `scores.py`                       | Score functions (logdet, effective rank, condition number, spectral gap)  |
-| `utils.py`                        | Activation masks, HardMish, ReLU replacement utilities                    |
-| `score_feature_diversity_full.py` | Feature diversity scoring for all 15,625 architectures                    |
-| `search_pipeline.py`              | Two-stage pipeline: primary metric + GC re-ranking                        |
-| `test_grad_consistency.py`        | Gradient consistency experiment                                           |
-| `compare_overrated_underrated.py` | NASWOT failure analysis (overrated vs underrated)                         |
-| `skip_stratified_analysis.py`     | Full stratified analysis by skip count                                    |
+```bash
+# Pipeline results (requires search_pipeline.py output)
+python plots/plot_pipeline.py --results results/pipeline_topk3856_gc.npy.npz
+
+# Gradient consistency (requires test_grad_consistency.py output)
+python plots/plot_grad_consistency.py
+
+# Failure analysis (requires pre-computed NASWOT scores)
+python plots/plot_failure_analysis.py \
+    --scores results/full_baseline_hook_logdet_nasbench201_cifar10__none_0.05_1_True_128_1_1.npy \
+    --accs results/full_baseline_accs_nasbench201_cifar10_True.npy
+```
+
+---
+
+## Project Structure
+
+```
+Beyond-NASWOT/
+├── score_networks.py               # NASWOT scoring + P1/P2 (derivative masks, binary threshold)
+├── score_feature_diversity_full.py  # Feature diversity for all 15,625 architectures
+├── search_pipeline.py              # Two-stage pipeline: primary metric + GC re-rank
+├── score_networks_expressivity.py  # P3: layer-weighted spectral scoring
+├── scores.py                       # Score functions (logdet, eff_rank, condition, spectral_gap)
+├── utils.py                        # Activation masks, ReLU replacement utilities
+├── nasspace.py                     # NAS-Bench-201 search space wrapper
+├── env.yml                         # Conda environment spec
+│
+├── plots/                          # Visualization scripts
+│   ├── plot_pipeline.py            # Pipeline result plots (GC split, accuracy comparison)
+│   ├── plot_grad_consistency.py    # Gradient consistency plots
+│   ├── plot_failure_analysis.py    # Failure analysis plots
+│   ├── plot_skip_metrics.py        # Skip connection metric plots
+│   └── plot_scores.py             # Original score vs accuracy scatter
+│
+├── experiments/                    # Analysis & experiment scripts
+│   ├── test_feature_diversity.py   # 200-arch feature diversity prototype
+│   ├── test_grad_consistency.py    # 200-arch gradient consistency experiment
+│   ├── compare_overrated_underrated.py  # Overrated vs underrated topology analysis
+│   ├── skip_stratified_analysis.py      # Full stratified analysis by skip count
+│   ├── analyze_activation_agnostic.py   # Activation agnosticity proof
+│   ├── failure_analysis.py         # NASWOT failure case identification
+│   └── failure_attribution.py      # Structural attribution of failures
+│
+├── results/                        # Pre-computed scores (.npy) and pipeline outputs (.npz)
+├── models/                         # NAS-Bench-201 cell-based tiny networks
+├── datasets/                       # Dataset loading (CIFAR-10/100, ImageNet16-120)
+└── nas_201_api/                    # NAS-Bench-201 Python API
+```
 
 ## References
 

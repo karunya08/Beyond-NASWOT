@@ -12,11 +12,15 @@ Idea: NASWOT builds K (samples x samples) from activation masks.
       conv3x3 random filters -> diverse spatial patterns -> high rank G
       conv1x1 random filters -> random channel mixing -> lower diversity
 
-Usage:
-    python test_feature_diversity.py --max_archs 200 --GPU 0
+Run from project root:
+    python experiments/test_feature_diversity.py --trainval --max_archs 200 --GPU 0
+
+Prerequisite: None (scores all from scratch)
 """
 
 import argparse
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import nasspace
 import datasets
 import random
@@ -247,36 +251,6 @@ tau_ld_hooks, _ = stats.kendalltau(s_ld, n_h)
 print(f'Kendall tau (feature_diversity, n_hooks):       {tau_div_hooks:.4f}')
 print(f'Kendall tau (logdet, n_hooks):                  {tau_ld_hooks:.4f}')
 
-# Normalized feature diversity: feat_div / n_hooks
-s_div_norm = s_div / np.maximum(n_h, 1)
-tau_div_norm, _ = stats.kendalltau(a, s_div_norm)
-tau_div_norm_hooks, _ = stats.kendalltau(s_div_norm, n_h)
-print(f'Kendall tau (feat_div / n_hooks, acc):          {tau_div_norm:.4f}')
-print(f'Kendall tau (feat_div / n_hooks, n_hooks):      {tau_div_norm_hooks:.4f}  (confound)')
-
-# Log version: log(feat_div) - alpha * n_hooks (sweep alpha)
-print('\nAlpha sweep for log(feat_div) - alpha * n_hooks:')
-log_div = np.log(s_div + 1)
-best_alpha, best_tau_alpha = 0, 0
-for alpha in [0.0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5]:
-    s_alpha = log_div - alpha * n_h
-    t_alpha, _ = stats.kendalltau(a, s_alpha)
-    t_alpha_hooks, _ = stats.kendalltau(s_alpha, n_h)
-    print(f'  alpha={alpha:.2f}: tau(score,acc)={t_alpha:.4f}, tau(score,n_hooks)={t_alpha_hooks:.4f}')
-    if t_alpha > best_tau_alpha:
-        best_tau_alpha = t_alpha
-        best_alpha = alpha
-
-print(f'  Best: alpha={best_alpha:.2f}, tau={best_tau_alpha:.4f}')
-
-# Combined score: rank(logdet) + rank(feature_diversity)
-from scipy.stats import rankdata
-rank_ld = rankdata(s_ld)
-rank_div = rankdata(s_div)
-combined = rank_ld + rank_div
-tau_combined, _ = stats.kendalltau(a, combined)
-print(f'\nKendall tau (rank_logdet + rank_feat_div, acc): {tau_combined:.4f}')
-
 # Per-band tau
 print('\nPer-band tau:')
 for label, lo, hi in [('Bottom 50%', 0, 50), ('Top 50%', 50, 100)]:
@@ -286,11 +260,11 @@ for label, lo, hi in [('Bottom 50%', 0, 50), ('Top 50%', 50, 100)]:
     if mask.sum() > 5:
         t_div, _ = stats.kendalltau(a[mask], s_div[mask])
         t_ld, _ = stats.kendalltau(a[mask], s_ld[mask])
-        t_norm, _ = stats.kendalltau(a[mask], s_div_norm[mask])
         print(f'  {label} (n={mask.sum()}): '
-              f'tau_div={t_div:.4f}, tau_ld={t_ld:.4f}, tau_norm={t_norm:.4f}')
+              f'tau_div={t_div:.4f}, tau_ld={t_ld:.4f}')
 
 # Save results
+os.makedirs(args.save_loc, exist_ok=True)
 np.save(f'{args.save_loc}/feature_diversity_scores_{max_archs}.npy', scores_div)
 np.save(f'{args.save_loc}/feature_diversity_logdet_{max_archs}.npy', scores_logdet)
 np.save(f'{args.save_loc}/feature_diversity_accs_{max_archs}.npy', accs)

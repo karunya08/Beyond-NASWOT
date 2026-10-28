@@ -20,11 +20,15 @@ Idea:
 
   This is zero-cost (same cost as NASWOT: two forward+backward passes).
 
-Usage:
-    python test_grad_consistency.py --trainval --max_archs 200 --GPU 0
+Run from project root:
+    python experiments/test_grad_consistency.py --trainval --max_archs 200 --GPU 0
+
+Prerequisite: None (scores all from scratch)
 """
 
 import argparse
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import nasspace
 import datasets
 import random

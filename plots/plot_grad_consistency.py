@@ -2,6 +2,12 @@
 plot_grad_consistency.py
 ========================
 Plots for gradient consistency results.
+
+Run from project root:
+    python plots/plot_grad_consistency.py
+
+Prerequisite: Run test_grad_consistency.py first to generate results/grad_consistency_200_*.npy
+    python experiments/test_grad_consistency.py --trainval --max_archs 200 --GPU 0
 """
 
 import numpy as np

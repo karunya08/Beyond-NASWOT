@@ -12,10 +12,16 @@ Key questions:
 If tau is high between groups but low within groups, NASWOT is just
 separating complexity levels, not measuring architecture quality.
 
-Usage:
-    python skip_stratified_analysis.py
+Run from project root:
+    python experiments/skip_stratified_analysis.py
+
+Prerequisite: Pre-computed NASWOT scores in results/
+    python score_networks.py --trainval --augtype none --repeat 1 --score hook_logdet \
+        --batch_size 128 --GPU 0 --dataset cifar10
 """
 
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import numpy as np
 from scipy import stats
 from nas_201_api import NASBench201API as API

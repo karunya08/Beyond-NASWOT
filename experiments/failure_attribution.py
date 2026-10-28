@@ -7,14 +7,19 @@ Loads the overrated/underrated failure sets from failure_analysis.py
 and queries NAS-Bench-201 for architecture structure, then compares
 operation distributions, param counts, and structural patterns.
 
-Usage
------
-python failure_attribution.py --api_loc ../NAS-Bench-201-v1_0-e61699.pth
+Run from project root:
+    python experiments/failure_attribution.py --api_loc ../NAS-Bench-201-v1_0-e61699.pth
+
+Prerequisite: Run failure_analysis.py first to generate failure_sets/
+    python experiments/failure_analysis.py \
+        --scores results/full_baseline_hook_logdet_nasbench201_cifar10__none_0.05_1_True_128_1_1.npy \
+        --accs results/full_baseline_accs_nasbench201_cifar10_True.npy
 """
 
 import argparse
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import numpy as np
-import os
 from collections import Counter
 from nas_201_api import NASBench201API as API
 

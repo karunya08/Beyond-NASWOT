@@ -4,8 +4,14 @@ plot_skip_metrics.py
 Visualize which metric best separates overrated vs underrated architectures.
 Loads fewstep results + failure sets and creates comparison plots.
 
-Usage:
-    python plot_skip_metrics.py
+Run from project root:
+    python plots/plot_skip_metrics.py
+
+Prerequisite: Run failure_analysis.py and test_grad_consistency.py first
+    python experiments/failure_analysis.py \
+        --scores results/full_baseline_hook_logdet_nasbench201_cifar10__none_0.05_1_True_128_1_1.npy \
+        --accs results/full_baseline_accs_nasbench201_cifar10_True.npy
+    python experiments/test_grad_consistency.py --trainval --max_archs 200 --GPU 0
 """
 
 import numpy as np

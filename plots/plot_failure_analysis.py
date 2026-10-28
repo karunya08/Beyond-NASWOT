@@ -3,17 +3,21 @@ plot_failure_analysis.py
 ========================
 Generate presentation-ready plots from failure analysis + attribution results.
 
-Usage
------
-python plot_failure_analysis.py \
-    --scores results/full_baseline_hook_logdet_nasbench201_cifar10__none_0.05_1_True_128_1_1.npy \
-    --accs results/full_baseline_accs_nasbench201_cifar10_True.npy \
-    --api_loc ../NAS-Bench-201-v1_0-e61699.pth
+Run from project root:
+    python plots/plot_failure_analysis.py \
+        --scores results/full_baseline_hook_logdet_nasbench201_cifar10__none_0.05_1_True_128_1_1.npy \
+        --accs results/full_baseline_accs_nasbench201_cifar10_True.npy \
+        --api_loc ../NAS-Bench-201-v1_0-e61699.pth
+
+Prerequisite: Pre-computed NASWOT scores in results/
+    python score_networks.py --trainval --augtype none --repeat 1 --score hook_logdet \
+        --batch_size 128 --GPU 0 --dataset cifar10
 """
 
 import argparse
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import numpy as np
-import os
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
