@@ -1,6 +1,6 @@
 # Beyond NASWOT
 
-**Course**: C6886 | **Team**: Karunya Harikrishnan, Tejaswi  
+**Course**: CS6886
 Based on [Neural Architecture Search Without Training](https://github.com/BayesWatch/nas-without-training) (Mellor et al., ICML 2021)
 
 ---
@@ -22,21 +22,21 @@ We implemented derivative masks (`sigma'(h)`) for HardSwish and Mish (alongside 
 
 ### Finding 2: Feature Diversity Beats NASWOT (tau +0.10)
 
-| Metric | CIFAR-10 | CIFAR-100 |
-|--------|----------|-----------|
-| NASWOT (logdet) | 0.5634 | 0.5921 |
-| Feature Diversity | 0.6704 | 0.6976 |
-| **Improvement** | **+0.1070** | **+0.1055** |
+| Metric            | CIFAR-10    | CIFAR-100   |
+| ----------------- | ----------- | ----------- |
+| NASWOT (logdet)   | 0.5634      | 0.5921      |
+| Feature Diversity | 0.6704      | 0.6976      |
+| **Improvement**   | **+0.1070** | **+0.1055** |
 
 Feature diversity = sum of effective ranks of channel correlation matrices across Conv2d layers. The improvement is largest in the top half where NAS actually needs to discriminate (top-half tau: +0.068 on CIFAR-10, +0.126 on CIFAR-100).
 
 ### Finding 3: NASWOT's Failure Mode is Skip Blindness
 
-| Feature | tau(feat, acc) | tau(feat, score) | Gap |
-|---------|---------------|-----------------|-----|
-| n_parametric | +0.55 | +0.81 | NASWOT loves params |
-| n_skip | -0.05 | -0.24 | NASWOT penalizes 5x harder |
-| has_true_residual | +0.03 | -0.15 | NASWOT penalizes residuals |
+| Feature           | tau(feat, acc) | tau(feat, score) | Gap                        |
+| ----------------- | -------------- | ---------------- | -------------------------- |
+| n_parametric      | +0.55          | +0.81            | NASWOT loves params        |
+| n_skip            | -0.05          | -0.24            | NASWOT penalizes 5x harder |
+| has_true_residual | +0.03          | -0.15            | NASWOT penalizes residuals |
 
 Overrated architectures (high score, low accuracy) have 0.6% true residual. Underrated (low score, high accuracy) have 47%. NASWOT's top 50 picks are **100% zero-skip**.
 
@@ -44,11 +44,11 @@ Overrated architectures (high score, low accuracy) have 0.6% true residual. Unde
 
 Gradient Consistency (GC) = cosine similarity of gradients on two mini-batches. Within NASWOT's top quartile:
 
-| Split | Mean Acc | Mean Skips | % True Residual |
-|-------|----------|-----------|----------------|
-| High GC (n=1928) | 89.02% | 0.82 | **18.1%** |
-| Low GC (n=1928) | 88.92% | 0.69 | **0.7%** |
-| Ground Truth | 89.66% | 1.22 | 27.0% |
+| Split            | Mean Acc | Mean Skips | % True Residual |
+| ---------------- | -------- | ---------- | --------------- |
+| High GC (n=1928) | 89.02%   | 0.82       | **18.1%**       |
+| Low GC (n=1928)  | 88.92%   | 0.69       | **0.7%**        |
+| Ground Truth     | 89.66%   | 1.22       | 27.0%           |
 
 - GC vs skip count: tau=0.11 (NASWOT pool), tau=0.21 (FeatDiv pool), both p<0.0001
 - Accuracy diff: p=0.012 (significant on NASWOT pool)
@@ -58,12 +58,12 @@ Gradient Consistency (GC) = cosine similarity of gradients on two mini-batches. 
 
 **FeatDiv + GC** nearly perfectly recovers the ground truth skip distribution:
 
-| Method | Mean Skips | % True Residual |
-|--------|-----------|----------------|
-| NASWOT top-Q | 0.75 | 9.4% |
-| FeatDiv top-Q | 0.89 | 13.7% |
-| FeatDiv + GC top half | 1.04 | **26.5%** |
-| Ground Truth top-Q | 1.22 | **26.8%** |
+| Method                | Mean Skips | % True Residual |
+| --------------------- | ---------- | --------------- |
+| NASWOT top-Q          | 0.75       | 9.4%            |
+| FeatDiv top-Q         | 0.89       | 13.7%           |
+| FeatDiv + GC top half | 1.04       | **26.5%**       |
+| Ground Truth top-Q    | 1.22       | **26.8%**       |
 
 ---
 
@@ -135,20 +135,17 @@ python skip_stratified_analysis.py --trainval --GPU 0
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
-| `score_networks.py` | NASWOT scoring with P1/P2 extensions (derivative masks, binary threshold) |
-| `score_networks_expressivity.py` | P3: layer-weighted spectral scoring |
-| `scores.py` | Score functions (logdet, effective rank, condition number, spectral gap) |
-| `utils.py` | Activation masks, HardMish, ReLU replacement utilities |
-| `score_feature_diversity_full.py` | Feature diversity scoring for all 15,625 architectures |
-| `search_pipeline.py` | Two-stage pipeline: primary metric + GC re-ranking |
-| `plot_pipeline.py` | Generate plots from pipeline results |
-| `test_grad_consistency.py` | Gradient consistency experiment |
-| `compare_overrated_underrated.py` | NASWOT failure analysis (overrated vs underrated) |
-| `skip_stratified_analysis.py` | Full stratified analysis by skip count |
-| `topology_analysis.py` | Architecture topology parsing |
-| `plot_grad_consistency.py` | GC visualization plots |
+| File                              | Purpose                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------- |
+| `score_networks.py`               | NASWOT scoring with P1/P2 extensions (derivative masks, binary threshold) |
+| `score_networks_expressivity.py`  | P3: layer-weighted spectral scoring                                       |
+| `scores.py`                       | Score functions (logdet, effective rank, condition number, spectral gap)  |
+| `utils.py`                        | Activation masks, HardMish, ReLU replacement utilities                    |
+| `score_feature_diversity_full.py` | Feature diversity scoring for all 15,625 architectures                    |
+| `search_pipeline.py`              | Two-stage pipeline: primary metric + GC re-ranking                        |
+| `test_grad_consistency.py`        | Gradient consistency experiment                                           |
+| `compare_overrated_underrated.py` | NASWOT failure analysis (overrated vs underrated)                         |
+| `skip_stratified_analysis.py`     | Full stratified analysis by skip count                                    |
 
 ## References
 
