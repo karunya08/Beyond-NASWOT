@@ -16,7 +16,7 @@ NASWOT scores untrained architectures using activation-pattern diversity (log de
 
 ### Finding 1: NASWOT is Activation-Agnostic at Random Init (P1/P2)
 
-We implemented derivative masks (`sigma'(h)`) for HardSwish and Mish (alongside ReLU). Key insight: in untrained networks, pre-activation magnitudes grow with depth (~4000 by layer 15). The smooth transition region of Swish/Mish lies in [-3, 3] -- essentially no values land there. All asymptotically-linear activations (ReLU, Swish, Mish, GELU, ELU) degenerate to the same binary step function at random init.
+We implemented derivative masks (`sigma'(h)`) for HardSwish and Mish (alongside ReLU) from **jahs-bench 201**. Key insight: in untrained networks, pre-activation magnitudes grow with depth (~4000 by layer 15). The smooth transition region of Swish/Mish lies in [-3, 3] -- essentially no values land there. All asymptotically-linear activations (ReLU, Swish, Mish, GELU, ELU) degenerate to the same binary step function at random init.
 
 **Implication**: NASWOT already works for all mainstream activations without modification. The exception is doubly-saturating activations (tanh, sigmoid), for which it degenerates entirely.
 
