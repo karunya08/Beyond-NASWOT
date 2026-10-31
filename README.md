@@ -1,6 +1,5 @@
 # Beyond NASWOT
 
-**Course**: C6886 | **Team**: Karunya Harikrishnan, Tejaswi  
 Based on [Neural Architecture Search Without Training](https://github.com/BayesWatch/nas-without-training) (Mellor et al., ICML 2021)
 
 ---
@@ -91,8 +90,8 @@ pip install "numpy>=1.24,<2" scipy matplotlib tqdm yacs thop
 
 ### Data & Benchmark
 
-1. **CIFAR-10/100**: Downloaded automatically on first run to `../cifardata/`
-2. **NAS-Bench-201 API** (~2 GB): Download `NAS-Bench-201-v1_0-e61699.pth` from the [NAS-Bench-201 repository](https://github.com/D-X-Y/NAS-Bench-201) and place at `../NAS-Bench-201-v1_0-e61699.pth` (or pass `--api_loc <path>`)
+1. **NAS-Bench-201 API** (~2 GB): Download `NAS-Bench-201-v1_0-e61699.pth` from the [NAS-Bench-201 repository](https://github.com/D-X-Y/NAS-Bench-201) and place it parallel to the repo (or pass `--api_loc <path>`)
+2. **CIFAR-10/100**: Downloaded automatically on first run to `../cifardata/`
 
 ---
 
