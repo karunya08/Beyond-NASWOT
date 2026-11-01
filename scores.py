@@ -1,68 +1,17 @@
+"""
+Scoring functions for NASWOT and extensions.
+
+Baseline:  hooklogdet  (Mellor et al., ICML 2021)
+Novelty:   CKA-guided layer weighting — use class labels to determine
+           which layers matter via Centered Kernel Alignment
+Systems:   Hardware-cost-aware scoring — normalize expressivity by
+           real hardware metrics (params, latency, memory)
+"""
+
 import numpy as np
-import torch
 
 
-# ---------------------------------------------------------------------------
-# Original scores
-# ---------------------------------------------------------------------------
-
-def hooklogdet(K, labels=None):
-    s, ld = np.linalg.slogdet(K)
-    return ld
-
-def random_score(jacob, label=None):
-    return np.random.normal()
-
-
-# ---------------------------------------------------------------------------
-# Spectral scores  (P3b -- eigenvalue decomposition of K)
-# ---------------------------------------------------------------------------
-
-def _safe_eigvals(K):
-    """Return eigenvalues of K sorted ascending, clamped for stability."""
-    eigvals = np.linalg.eigvalsh(K)
-    return np.maximum(eigvals, 1e-10)
-
-
-def hook_effective_rank(K, labels=None):
-    """Effective rank = exp(entropy of normalised eigenvalue distribution).
-
-    Captures how many independent directions the activation patterns span.
-    Higher effective rank -> more uniform use of representation space.
-    """
-    eigvals = _safe_eigvals(K)
-    p = eigvals / eigvals.sum()
-    entropy = -np.sum(p * np.log(p))
-    return entropy  # log of effective rank; monotonic, avoids large numbers
-
-
-def hook_condition(K, labels=None):
-    """Negative log condition number of K.
-
-    Condition number = lambda_max / lambda_min.  Lower condition -> better
-    conditioned kernel -> more stable training.  We negate so that *higher
-    score = better architecture* (consistent with other scores).
-    """
-    eigvals = _safe_eigvals(K)
-    cond = eigvals[-1] / eigvals[0]
-    return -np.log(cond)
-
-
-def hook_spectral_gap(K, labels=None):
-    """Ratio of second-largest to largest eigenvalue (closer to 1 = more uniform).
-
-    Large spectral gap means one direction dominates; small gap means the
-    kernel distributes information across multiple dimensions.
-    """
-    eigvals = _safe_eigvals(K)
-    if len(eigvals) < 2:
-        return 0.0
-    return eigvals[-2] / eigvals[-1]
-
-
-# ---------------------------------------------------------------------------
-# CKA helpers  (for layer-weighted scoring)
-# ---------------------------------------------------------------------------
+# ─── Helpers ─────────────────────────────────────────────────────────────────
 
 def _to_numpy(labels):
     """Convert labels tensor to numpy array."""
@@ -93,9 +42,23 @@ def _cka(K, Y):
     return np.trace(Kc @ Yc) / denom
 
 
-# ---------------------------------------------------------------------------
-# CKA-guided layer weighting
-# ---------------------------------------------------------------------------
+# ═══════════════════════════════════════════════════════════════════════════════
+#  BASELINE — Original NASWOT (Mellor et al., ICML 2021)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def hooklogdet(K, labels=None):
+    """Original NASWOT: log det(K).  Label-agnostic, equal layer weights."""
+    s, ld = np.linalg.slogdet(K)
+    return ld
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+#  CKA-GUIDED LAYER WEIGHTING
+#
+#  Use CKA(K_l, Y) to let labels discover which layers matter.
+#  Layers whose activation patterns correlate with class structure
+#  get higher weight.
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def layer_cka_weighted(K_layers, labels):
     """CKA-guided layer weighting.
@@ -117,60 +80,74 @@ def layer_cka_weighted(K_layers, labels):
     return ld
 
 
-
-
-# ---------------------------------------------------------------------------
-# Hardware-cost-aware scoring (systems component)
+# ═══════════════════════════════════════════════════════════════════════════════
+#  SYSTEMS COMPONENT — HARDWARE-COST-AWARE SCORING
 #
-# Normalize expressivity by real hardware metrics to find architectures
-# that balance accuracy with efficiency on the target GPU.
+#  Incorporate real hardware metrics (params, latency, memory) into the score.
+#  Instead of "which architecture is most expressive?", ask "which gives the
+#  best expressivity per unit of hardware cost?"
 #
-#   systems_score = expressivity / cost^alpha
-# ---------------------------------------------------------------------------
+#  systems_score = expressivity / cost^alpha
+#
+#  These are post-processing functions applied AFTER computing expressivity.
+# ═══════════════════════════════════════════════════════════════════════════════
 
 def systems_score_params(expressivity, params, alpha=0.5):
-    """Expressivity normalized by parameter count."""
+    """Expressivity normalized by parameter count.
+
+    score = expressivity / params^alpha
+
+    Favors architectures that are expressive with fewer parameters.
+    """
     if params <= 0:
         return expressivity
     return expressivity / (params ** alpha)
 
 
 def systems_score_latency(expressivity, latency, alpha=0.5):
-    """Expressivity normalized by inference latency (real GPU timing)."""
+    """Expressivity normalized by inference latency.
+
+    score = expressivity / latency^alpha
+
+    Favors architectures that are expressive AND fast on the target GPU.
+    This is the most "systems-aware" metric because latency captures real
+    hardware behavior (memory bandwidth, kernel efficiency, parallelism)
+    that FLOPs cannot.
+    """
     if latency <= 0:
         return expressivity
     return expressivity / (latency ** alpha)
 
 
 def systems_score_memory(expressivity, memory, alpha=0.5):
-    """Expressivity normalized by peak GPU memory."""
+    """Expressivity normalized by peak GPU memory.
+
+    score = expressivity / memory^alpha
+
+    Favors architectures that achieve expressivity within a memory budget.
+    """
     if memory <= 0:
         return expressivity
     return expressivity / (memory ** alpha)
 
 
-# ---------------------------------------------------------------------------
-# Score registries
-# ---------------------------------------------------------------------------
 
-# K-based scores (operate on full K matrix)
+# ─── Registries ──────────────────────────────────────────────────────────────
+
+# K-based scores (operate on full K matrix; signature: K, labels)
 K_SCORES = {
     'hook_logdet': hooklogdet,
 }
 
-# Layer-based scores (operate on per-layer K matrices)
+# Layer-based scores (operate on per-layer K matrices; signature: K_layers, labels)
 LAYER_SCORES = {
     'layer_cka_weighted': layer_cka_weighted,
 }
 
-# Legacy registry (used by score_networks.py)
+# Legacy registry for backward compatibility with baseline score_networks.py
 _scores = {
-        'hook_logdet': hooklogdet,
-        'hook_eff_rank': hook_effective_rank,
-        'hook_condition': hook_condition,
-        'hook_spectral_gap': hook_spectral_gap,
-        'random': random_score
-        }
+    'hook_logdet': hooklogdet,
+}
 
 def get_score_func(score_name):
     return _scores[score_name]
