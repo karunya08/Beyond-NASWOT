@@ -64,6 +64,73 @@ Gradient Consistency (GC) = cosine similarity of gradients on two mini-batches. 
 | FeatDiv + GC top half | 1.04       | **26.5%**       |
 | Ground Truth top-Q    | 1.22       | **26.8%**       |
 
+### Finding 6: CKA-Guided Layer Weighting (tau +0.019 CIFAR-10, +0.024 CIFAR-100)
+
+**Problem**: NASWOT sums K matrices from all ReLU layers with equal weight. Early layers detect generic features (edges, textures) while later layers capture class-specific patterns. Equal weighting lets early-layer noise dilute the class-discriminative signal.
+
+**Method**: For each layer l, we compute CKA (Centered Kernel Alignment) between that layer's kernel matrix K_l and the ideal label kernel Y, where Y[i,j] = 1 if images i and j share the same class, 0 otherwise. CKA measures how well the layer's activation patterns align with class structure. The CKA value becomes the layer's weight:
+
+```
+Y[i,j] = 1 if label_i == label_j, else 0        # ideal class kernel
+w_l = CKA(K_l, Y) = tr(K_l_c @ Y_c) / (||K_l_c|| * ||Y_c||)   # centering + normalize
+K_final = sum(w_l * K_l)                         # weighted combination
+score = log det(K_final)                         # expressivity score
+```
+
+Layers that already separate classes (high CKA with Y) get high weight. Layers that see all images as similar (low CKA) get low weight. This is data-driven -- no hardcoded rule about which layers matter.
+
+**Implementation**: `scores.py::layer_cka_weighted()` -- takes per-layer K matrices + class labels, returns weighted log-det score. Added to `score_cka_systems.py` which collects per-layer K matrices during the forward pass (unlike `score_networks.py` which only stores the sum).
+
+**Results** (all 15,625 NAS-Bench-201 architectures):
+
+| Metric            | CIFAR-10    | CIFAR-100   |
+| ----------------- | ----------- | ----------- |
+| NASWOT (logdet)   | 0.5853      | 0.6206      |
+| CKA-weighted      | 0.6044      | 0.6441      |
+| **Improvement**   | **+0.0191** | **+0.0235** |
+
+| Top-K Selection   | CIFAR-10 (Baseline -> CKA) | CIFAR-100 (Baseline -> CKA) |
+| ----------------- | -------------------------- | --------------------------- |
+| Top-1 accuracy    | 86.51% -> **89.04% (+2.53%)**  | 65.71% -> **69.86% (+4.15%)**  |
+| Top-5 avg         | 88.91% -> **89.69% (+0.78%)**  | 69.24% -> **69.78% (+0.54%)**  |
+| Top-10 avg        | 89.24% -> **89.77% (+0.53%)**  | 69.73% -> **69.92% (+0.20%)**  |
+
+CKA-weighted consistently outperforms baseline across both datasets and all K values.
+
+### Finding 7: Hardware-Cost-Aware Architecture Selection (Systems)
+
+**Problem**: NASWOT asks "which architecture is most expressive?" but ignores deployment cost. A practitioner deploying on a phone or edge device needs the best architecture *that fits their hardware budget* -- not the biggest one.
+
+**Method**: We measure real hardware metrics during the same forward pass used for scoring, then normalize expressivity by cost:
+
+```
+systems_score = expressivity / cost^alpha
+```
+
+where cost is one of:
+- **params**: total parameter count (`sum(p.numel())`)
+- **latency**: actual GPU inference time (measured with `torch.cuda.synchronize()`, not theoretical FLOPs)
+- **memory**: peak GPU memory (`torch.cuda.max_memory_allocated()`)
+
+Alpha controls the accuracy-efficiency tradeoff:
+- alpha=0 : pure accuracy (ignore cost entirely)
+- alpha=0.5 : moderate efficiency preference (default)
+- alpha=1.0 : strong efficiency preference
+
+**Implementation**: `scores.py::systems_score_params/latency/memory()` -- simple normalization functions. Hardware profiling is built into `score_cka_systems.py` (no separate profiling step needed).
+
+**Results** (CIFAR-10, alpha=0.5):
+
+| Method picks...         | Accuracy | Params | Latency | Memory |
+| ----------------------- | -------- | ------ | ------- | ------ |
+| CKA-weighted (best acc) | 89.04%   | 456K   | 140ms   | 980MB  |
+| sys_params              | 85.97%   | 101K   | 137ms   | 244MB  |
+| sys_latency             | 84.64%   | 73K    | 12ms    | 165MB  |
+| sys_memory              | 84.27%   | 73K    | 13ms    | 91MB   |
+
+At 3% accuracy cost: **4.5x fewer parameters, 4x less memory**.
+At 4.4% accuracy cost: **12x faster inference**.
+
 ---
 
 ## Setup
@@ -136,6 +203,46 @@ python plots/plot_pipeline.py --results results/pipeline_naswot_topk3856_gc.npy.
 python plots/plot_pipeline.py --results results/pipeline_feat_div_topk3906_gc.npy.npz
 ```
 
+
+### CKA-weighted scoring + hardware-aware NAS
+
+Two scripts: `score_cka_systems.py` (scorer, needs GPU) and `analyze_cka_systems.py` (analyzer, no GPU).
+
+```bash
+# Step 1: Score all architectures (~60 min per dataset on GPU)
+python score_cka_systems.py --trainval --GPU 0 --dataset cifar10 \
+    --api_loc <path-to-NAS-Bench-201.pth> --data_loc ./cifardata
+
+# CIFAR-100
+python score_cka_systems.py --trainval --GPU 0 --dataset cifar100 \
+    --api_loc <path-to-NAS-Bench-201.pth> --data_loc ./cifardata
+
+# Quick test (500 architectures, ~5 min)
+python score_cka_systems.py --trainval --GPU 0 --max_archs 500 \
+    --api_loc <path-to-NAS-Bench-201.pth> --data_loc ./cifardata
+
+# Custom alpha for systems scoring (default 0.5)
+python score_cka_systems.py --trainval --GPU 0 --alpha 0.3 ...
+```
+
+```bash
+# Step 2: Analyze results (no GPU needed, instant)
+python analyze_cka_systems.py --dataset cifar10
+python analyze_cka_systems.py --dataset cifar100
+
+# Skip plot generation (headless server)
+python analyze_cka_systems.py --dataset cifar10 --no_plots
+
+# If you used a custom alpha in Step 1, pass the same alpha here
+python analyze_cka_systems.py --dataset cifar10 --alpha 0.3
+```
+
+Output:
+- Correlation table (Kendall tau, Spearman rho for baseline vs CKA)
+- Top-K architecture selection quality (K=1,5,10,20,50)
+- Systems analysis table (which architecture each method picks + its cost)
+- Plots saved to `plots/cka_<dataset>.png` and `plots/systems_<dataset>.png`
+
 ### Failure analysis
 
 ```bash
@@ -182,7 +289,7 @@ Beyond-NASWOT/
 ├── score_feature_diversity_full.py  # Feature diversity for all 15,625 architectures
 ├── search_pipeline.py              # Two-stage pipeline: primary metric + GC re-rank
 ├── score_networks_expressivity.py  # P3: layer-weighted spectral scoring
-├── scores.py                       # Score functions (logdet, eff_rank, condition, spectral_gap)
+├── scores.py                       # Score functions (logdet, spectral, CKA-weighted, systems)
 ├── utils.py                        # Activation masks, ReLU replacement utilities
 ├── nasspace.py                     # NAS-Bench-201 search space wrapper
 ├── env.yml                         # Conda environment spec

@@ -1,6 +1,24 @@
-*.pth
-__pycache__
-*.t7
-.vscode/
+# Virtual environments
+.venv/
+.naswot/
+__pycache__/
+*.pyc
 
-  nds_data/ 
+# Data (downloaded automatically)
+cifardata/
+../cifardata/
+
+# NAS-Bench-201 API (too large for git)
+*.pth
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archives
+*.zip
+*.tar.gz
