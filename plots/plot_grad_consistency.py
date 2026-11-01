@@ -28,11 +28,7 @@ logdet = np.load(f'{prefix}_logdet.npy')
 n_skips = np.load(f'{prefix}_nskips.npy')
 true_res = np.load(f'{prefix}_true_res.npy')
 
-# Load neg val loss from fewstep results
-prefix2 = 'results/fewstep_200_lr0.1'
-neg_val_loss = np.load(f'{prefix2}_neg_val_loss_20.npy')
-
-valid = (accs > 0) & np.isfinite(gc) & np.isfinite(logdet) & np.isfinite(neg_val_loss)
+valid = (accs > 0) & np.isfinite(gc) & np.isfinite(logdet)
 
 # Load overrated/underrated
 overrated_uids = set(np.load('failure_sets/overrated_uids.npy').tolist())
@@ -85,27 +81,6 @@ plt.savefig(os.path.join(SAVE_DIR, 'naswot_vs_gc.png'), dpi=200, bbox_inches='ti
 plt.savefig(os.path.join(SAVE_DIR, 'naswot_vs_gc.pdf'), bbox_inches='tight')
 plt.close()
 print('Plot 1a saved: naswot_vs_gc (2 panels)')
-
-# ============================================================
-# PLOT 1b: NASWOT vs Grad Consistency vs Neg Val Loss (3 panels)
-# ============================================================
-fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-
-plot_ov_un_hist(axes[0], logdet[over_mask], logdet[under_mask],
-                'NASWOT logdet score', 'NASWOT logdet', 'zero-cost', acc_ov, acc_un)
-plot_ov_un_hist(axes[1], gc[over_mask], gc[under_mask],
-                'Gradient Consistency (cosine sim)', 'Grad Consistency', 'zero-cost', acc_ov, acc_un)
-plot_ov_un_hist(axes[2], neg_val_loss[over_mask], neg_val_loss[under_mask],
-                'Neg Val Loss (after 20 SGD steps)', 'Neg Val Loss', '20 steps', acc_ov, acc_un)
-
-plt.suptitle('Overrated vs Underrated: NASWOT fails, both new metrics succeed',
-             fontsize=14, fontweight='bold', y=1.02)
-plt.tight_layout()
-plt.savefig(os.path.join(SAVE_DIR, 'naswot_vs_gc_vs_nvl.png'), dpi=200, bbox_inches='tight')
-plt.savefig(os.path.join(SAVE_DIR, 'naswot_vs_gc_vs_nvl.pdf'), bbox_inches='tight')
-plt.close()
-print('Plot 1b saved: naswot_vs_gc_vs_nvl (3 panels)')
-
 
 # ============================================================
 # PLOT 2: Grad consistency by skip count (bar chart)
