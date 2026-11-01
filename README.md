@@ -298,7 +298,6 @@ Beyond-NASWOT/
 │   ├── plot_pipeline.py            # Pipeline result plots (GC split, accuracy comparison)
 │   ├── plot_grad_consistency.py    # Gradient consistency plots
 │   ├── plot_failure_analysis.py    # Failure analysis plots
-│   ├── plot_skip_metrics.py        # Skip connection metric plots
 │   └── plot_scores.py             # Original score vs accuracy scatter
 │
 ├── experiments/                    # Analysis & experiment scripts
