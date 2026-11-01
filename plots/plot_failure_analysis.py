@@ -1,7 +1,6 @@
 """
 plot_failure_analysis.py
 ========================
-Generate presentation-ready plots from failure analysis + attribution results.
 
 Run from project root:
     python plots/plot_failure_analysis.py \
