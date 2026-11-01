@@ -117,6 +117,38 @@ def layer_cka_weighted(K_layers, labels):
     return ld
 
 
+
+
+# ---------------------------------------------------------------------------
+# Hardware-cost-aware scoring (systems component)
+#
+# Normalize expressivity by real hardware metrics to find architectures
+# that balance accuracy with efficiency on the target GPU.
+#
+#   systems_score = expressivity / cost^alpha
+# ---------------------------------------------------------------------------
+
+def systems_score_params(expressivity, params, alpha=0.5):
+    """Expressivity normalized by parameter count."""
+    if params <= 0:
+        return expressivity
+    return expressivity / (params ** alpha)
+
+
+def systems_score_latency(expressivity, latency, alpha=0.5):
+    """Expressivity normalized by inference latency (real GPU timing)."""
+    if latency <= 0:
+        return expressivity
+    return expressivity / (latency ** alpha)
+
+
+def systems_score_memory(expressivity, memory, alpha=0.5):
+    """Expressivity normalized by peak GPU memory."""
+    if memory <= 0:
+        return expressivity
+    return expressivity / (memory ** alpha)
+
+
 # ---------------------------------------------------------------------------
 # Score registries
 # ---------------------------------------------------------------------------
